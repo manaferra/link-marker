@@ -1,0 +1,42 @@
+html iframe#prospector-extension {
+    z-index: 2147483647 !important;
+    position: fixed !important;
+    top: 0 !important;
+    right: 0px !important;
+    height: 100% !important;
+    width: 360px!important;
+    overflow: hidden;
+    left: auto !important;
+}
+iframe.prospector {
+    z-index: 2147483647 !important;
+    border: none !important;
+    position: fixed;
+    display: block !important;
+    min-width: 0 !important;
+    max-height: none!important;
+    max-width: none!important;
+    background: #dedede !important;
+}
+html.prospector-on {
+    margin-right: 380px  !important;;
+}
+
+html iframe#prospector-extension-pagination {
+    bottom: 50px  !important;
+    right: 45%  !important;
+    left: auto !important;
+    top: auto !important;
+    height: 70px !important;
+    width: 232px!important;
+    overflow: hidden  !important;
+    position: fixed  !important;
+    margin: 0px !important;
+    z-index: 2147483647  !important;
+    border: 0px !important;
+}
+
+
+button{
+    background-color: transparent !important;
+}

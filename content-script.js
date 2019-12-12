@@ -23,10 +23,10 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
             nextLinkToLoad = items.linkMarkerLinks[activeIndex + 1];
         }
 
-        activeLinks = allLinks.map(obj => obj.link.url);
+        activeLinks = allLinks.map(obj => obj.url);
         activeLinks.forEach((activeLink) => {
             // Show prospector if domain matches
-            if (activeLink == document.location.href) {
+            if (activeLink.includes(document.location.href)) {
                 showProspector();
             }
         })
@@ -48,13 +48,16 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             chrome.storage.sync.set({'activeIndex': message.pageIndex});
             loadLinkByIndex(message.pageIndex);
         }
-
        
         if ( typeof message === 'object') {
-
             // Check data for next links
             if ( typeof message.fileData !== 'undefined') {
+                
                 addLinksToStorage(message);
+            }
+
+            if (typeof message.start_prospecting !== 'undefined'){
+                startProspecting();
             }
 
             if (message.chromeStorageData) {
@@ -83,7 +86,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     chrome.storage.local.set({'linkMarkerLinks': []});;
                     alert('All links are reviewed.');
 
-                    if (currentLink.link.url) {
+                    if (currentLink.url) {
                         location.reload(); 
                     }
 
@@ -91,13 +94,13 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     chrome.storage.local.set({'linkMarkerLinks': []});
                     alert('All links are reviewed.');
                     
-                    if (currentLink.link.url) {
+                    if (currentLink.url) {
                         location.reload(); 
                     }
                 } else {
 
-                    if (currentLink.link.url == nextLinkToLoad.link.url) {
-                        nextLinkToLoad.link.url = allLinks[activeIndex + 1];
+                    if (currentLink.url == nextLinkToLoad.url) {
+                        nextLinkToLoad.url = allLinks[activeIndex + 1];
                     }
 
                     if (message.status == 'approve') {
@@ -109,7 +112,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     chrome.storage.local.set({linkMarkerLinks: allLinks});
                     chrome.storage.sync.set({activeIndex: activeIndex  + 1});
 
-                    window.location.href = nextLinkToLoad.link.url;
+                    window.location.href = nextLinkToLoad.url;
                 }
             }
         }
@@ -215,17 +218,14 @@ function injectIframe(){
 async function setInitialDataToAngular(){
     var theLinkToLoad = currentLink;
     if ( typeof currentLink !== 'undefined' && currentLink != null) {
-        
+        theLinkToLoad.status = 'under_review';
     } else {
-        theLinkToLoad = {
-            link: {id: 0,title: '', url: '', site_url: '', website_links: [], website: {url: ''} },
-            id: 0, category_id: 0, user_id: 0,ampaign: {title: '',project: {title : '', client: {title: ''}}},review_user: {id: 0}
-        };
+        theLinkToLoad =  {url: '', status: '', emails: [], website_url: '', title: '', note: '', website_name: ''};
     }
 
     let siteName = $('meta[property="og:site_name"]').attr('content');
+    var domainURL = window.location.href.split("/");
     if (!siteName) {
-        var domainURL = window.location.href.split("/");
         siteName = domainURL[2].split('.');
         siteName = siteName[ siteName.length - 2 ];
     }
@@ -234,13 +234,14 @@ async function setInitialDataToAngular(){
         pageTitle = $('title').html();
     }
 
+    theLinkToLoad.website_url = domainURL[2];
+    theLinkToLoad.title = pageTitle;
+    theLinkToLoad.website_name = siteName;
     let data = {
-        site_name: siteName,
-        page_title: pageTitle,
-        window_link: window.location.href,
         linkData: theLinkToLoad
     }
 
+    console.log('Data sent to angular', data)
     chrome.runtime.sendMessage(data);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
@@ -290,21 +291,27 @@ function toggle(tabID){
     }
 }
 
+/**
+ * Add Links to Storage
+ * @param {array} message 
+ */
 function addLinksToStorage(message){
-    
+    allLinks = [];
     message.fileData.forEach(function(linkItem){
-        allLinks.push(linkItem);
+        let newItem = { url: linkItem };
+        allLinks.push(newItem);
     });
     chrome.storage.local.set({'linkMarkerLinks': allLinks});
-
 
     let nextIndex = activeIndex + 1;
     currentLink = allLinks[activeIndex];
     currentLink = allLinks[activeIndex];
 
     if(typeof allLinks[nextIndex] !== 'undefined'){
-         nextLinkToLoad = allLinks[nextIndex];
-    }    
+        nextLinkToLoad = allLinks[nextIndex];
+    } 
+    
+    chrome.storage.sync.set({'totalItems': allLinks.length});
 }
 
 /**
@@ -319,8 +326,8 @@ function addEmailsToCurrentLink(emails){
     var domainURL = window.location.href.split("/");
     siteName = domainURL[2];
     allLinks.forEach((item) => {
-        if (item.link.url.includes(domainURL[2])) {
-            item.link.website.emails = emails;
+        if (item.url.includes(domainURL[2])) {
+            item.website.emails = emails;
         }
     });
 
@@ -332,7 +339,7 @@ function addEmailsToCurrentLink(emails){
 */
 function loadLinkByIndex(pageIndex) {
    
-    let urlByIndex = allLinks[pageIndex].link.url;
+    let urlByIndex = allLinks[pageIndex].url;
     
     window.location.href = urlByIndex;
 }
@@ -370,4 +377,10 @@ function removeParam(key, sourceURL) {
         rtn = rtn + "?" + params_arr.join("&");
     }
     return rtn;
+}
+
+function startProspecting(){
+    if (currentLink) {
+        window.location.href = currentLink.url;
+    }
 }

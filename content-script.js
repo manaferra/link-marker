@@ -6,7 +6,6 @@ var totalItems = 0;
 var iframeInjected = false;
 var urlParams = new URLSearchParams(window.location.search);
 var activeLinks = [];
-checkChromeStorageData();
 
 chrome.storage.sync.get(['activeIndex'], function(item) {
     if (typeof item.activeIndex !== 'undefined') {
@@ -15,21 +14,19 @@ chrome.storage.sync.get(['activeIndex'], function(item) {
 });
 
 //Get Links from chrome storage
-chrome.storage.local.get(['nextLinks'], function(items) {
-    if (typeof items.nextLinks !== 'undefined') {
-        currentLink = items.nextLinks[activeIndex];
-        allLinks = items.nextLinks;
+chrome.storage.local.get(['linkMarkerLinks'], function(items) {
+    if (typeof items.linkMarkerLinks !== 'undefined') {
+        currentLink = items.linkMarkerLinks[activeIndex];
+        allLinks = items.linkMarkerLinks;
 
-        if (typeof items.nextLinks[activeIndex + 1] !== 'undefined') {
-            nextLinkToLoad = items.nextLinks[activeIndex + 1];
+        if (typeof items.linkMarkerLinks[activeIndex + 1] !== 'undefined') {
+            nextLinkToLoad = items.linkMarkerLinks[activeIndex + 1];
         }
 
         activeLinks = allLinks.map(obj => obj.link.url);
-        let activeURL = document.location.href;
-        activeURL = activeURL.split('/');
         activeLinks.forEach((activeLink) => {
             // Show prospector if domain matches
-            if (activeLink.includes(activeURL[2])) {
+            if (activeLink == document.location.href) {
                 showProspector();
             }
         })
@@ -52,14 +49,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             loadLinkByIndex(message.pageIndex);
         }
 
+       
         if ( typeof message === 'object') {
 
-            if (message.chromeStorageData) {
-                // Check data for next links
-                if ( typeof message.chromeStorageData.nextLinksData !== 'undefined') {
-                    addNextLinksToStorage(message);
-                }
+            // Check data for next links
+            if ( typeof message.fileData !== 'undefined') {
+                addLinksToStorage(message);
+            }
 
+            if (message.chromeStorageData) {
                 if ( typeof message.chromeStorageData.active_link !== 'undefined') {
                     let data = {
                         active_index: activeIndex,
@@ -75,14 +73,14 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
 
             // Check data for emails
             if ( typeof message.emails !== 'undefined') {
-                addEmailsToCurrentLink(message.emails, message.social_links);
+                addEmailsToCurrentLink(message.emails);
                 chrome.storage.sync.set({'linkWithEmails': currentLink});
             }
             
             if ( typeof message.showNextSite !== 'undefined') {
 
                 if (nextLinkToLoad == null){
-                    chrome.storage.local.set({'nextLinks': []});;
+                    chrome.storage.local.set({'linkMarkerLinks': []});;
                     alert('All links are reviewed.');
 
                     if (currentLink.link.url) {
@@ -90,7 +88,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     }
 
                 }else  if (typeof nextLinkToLoad === 'undefined' || typeof nextLinkToLoad.link.url === 'undefined' || nextLinkToLoad.link.url == document.location.href) {
-                    chrome.storage.local.set({'nextLinks': []});
+                    chrome.storage.local.set({'linkMarkerLinks': []});
                     alert('All links are reviewed.');
                     
                     if (currentLink.link.url) {
@@ -108,7 +106,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                         allLinks[activeIndex]['status'] = 'not_qualified';
                     }
 
-                    chrome.storage.local.set({nextLinks: allLinks});
+                    chrome.storage.local.set({linkMarkerLinks: allLinks});
                     chrome.storage.sync.set({activeIndex: activeIndex  + 1});
 
                     window.location.href = nextLinkToLoad.link.url;
@@ -245,23 +243,16 @@ async function setInitialDataToAngular(){
 
     chrome.runtime.sendMessage(data);
 
-    chrome.storage.local.get(['nextLinks'], function(items) {
-        if (typeof items.nextLinks !== 'undefined') {
-            if (items.nextLinks[activeIndex + 1]) {
-                nextLinkToLoad = items.nextLinks[activeIndex + 1];
+    chrome.storage.local.get(['linkMarkerLinks'], function(items) {
+        if (typeof items.linkMarkerLinks !== 'undefined') {
+            if (items.linkMarkerLinks[activeIndex + 1]) {
+                nextLinkToLoad = items.linkMarkerLinks[activeIndex + 1];
             } else {
                 nextLinkToLoad = null;
             }
             
         } 
     });
-
-    if (currentLink && currentLink.link && currentLink.link.website && currentLink.link.website.emails && currentLink.link.website.emails.length) {
-        chrome.runtime.sendMessage({
-            emails: currentLink.link.website.emails,
-            social_links: currentLink.link.website.social_links
-        });
-    }
 
     sendPaginationData();
 }
@@ -275,7 +266,6 @@ function injectCSS(){
     link.type = "text/css";
     link.rel = "stylesheet";
     link.id = "prospector-stylesheet";
-    // document.body.appendChild(link)
 
     var header = document.querySelector('head');
     insertAfterDOM(link, header);
@@ -300,45 +290,41 @@ function toggle(tabID){
     }
 }
 
-function addNextLinksToStorage(message){
+function addLinksToStorage(message){
     
-    message.chromeStorageData.nextLinksData.forEach(function(linkItem){
-        if(!allLinks.some(nextLink => nextLink.link.url === linkItem.link.url) && !allLinks.includes(linkItem)){
-            allLinks.push(linkItem);
-        }
+    message.fileData.forEach(function(linkItem){
+        allLinks.push(linkItem);
     });
-    chrome.storage.local.set({'nextLinks': allLinks});
+    chrome.storage.local.set({'linkMarkerLinks': allLinks});
 
 
     let nextIndex = activeIndex + 1;
     currentLink = allLinks[activeIndex];
+    currentLink = allLinks[activeIndex];
 
     if(typeof allLinks[nextIndex] !== 'undefined'){
-        nextLinkToLoad = allLinks[nextIndex];
-    }
+         nextLinkToLoad = allLinks[nextIndex];
+    }    
 }
 
 /**
  * Add emails to current link
  * @param {array} emails 
- * @param {array} socialLinks 
  */
-function addEmailsToCurrentLink(emails, socialLinks){
+function addEmailsToCurrentLink(emails){
     allLinks[activeIndex].link.website.emails = emails;
-    allLinks[activeIndex].link.website.social_links = socialLinks;
 
-    chrome.storage.local.set({'nextLinks': allLinks});
+    chrome.storage.local.set({'linkMarkerLinks': allLinks});
 
     var domainURL = window.location.href.split("/");
     siteName = domainURL[2];
     allLinks.forEach((item) => {
         if (item.link.url.includes(domainURL[2])) {
             item.link.website.emails = emails;
-            item.link.website.social_links = socialLinks;
         }
     });
 
-    chrome.storage.local.set({'nextLinks': allLinks});
+    chrome.storage.local.set({'linkMarkerLinks': allLinks});
 }
 
 /*
@@ -362,21 +348,6 @@ function sendPaginationData(){
         };
 
         chrome.runtime.sendMessage(data);
-    }
-}
-
-/*
- * Check if chrome storage data should be reseted
-*/
-function checkChromeStorageData(){
-    if (urlParams.has('prospector') && urlParams.get('prospector') == 'true') {
-        activeIndex = 0;
-        totalItems = 0;
-        chrome.storage.sync.set({'activeIndex': 0});
-        chrome.storage.sync.set({'totalItems': 0});
-        chrome.storage.local.set({'nextLinks': []});
-        allLinks = [];
-        window.history.pushState('page2', '', removeParam('prospector', window.location.href));  
     }
 }
 

@@ -60,53 +60,53 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                 startProspecting();
             }
 
-            if (message.chromeStorageData) {
-                if ( typeof message.chromeStorageData.active_link !== 'undefined') {
-                    let data = {
-                        active_index: activeIndex,
-                        batch_items_count: message.chromeStorageData.batch_items_count
-                    }
-
-                    if (totalItems != message.chromeStorageData.batch_items_count) {
-                        chrome.storage.sync.set({'totalItems': message.chromeStorageData.batch_items_count});
-                        chrome.runtime.sendMessage(data);
-                    }
-                }
-            }
-
-            // Check data for emails
-            if ( typeof message.emails !== 'undefined') {
-                addEmailsToCurrentLink(message.emails);
-                chrome.storage.sync.set({'linkWithEmails': currentLink});
+            if (typeof message.reset_data !== 'undefined'){
+                resetData();
             }
             
             if ( typeof message.showNextSite !== 'undefined') {
 
                 if (nextLinkToLoad == null){
-                    chrome.storage.local.set({'linkMarkerLinks': []});;
+                    chrome.storage.local.set({'linkMarkerLinks': []});
+                    chrome.storage.sync.set({'activeIndex': 0});
+                    chrome.storage.sync.set({'totalItems': 0});
                     alert('All links are reviewed.');
 
                     if (currentLink.url) {
                         location.reload(); 
                     }
 
-                }else  if (typeof nextLinkToLoad === 'undefined' || typeof nextLinkToLoad.link.url === 'undefined' || nextLinkToLoad.link.url == document.location.href) {
+                } else  if (typeof nextLinkToLoad === 'undefined') {
                     chrome.storage.local.set({'linkMarkerLinks': []});
+                    chrome.storage.sync.set({'activeIndex': 0});
+                    chrome.storage.sync.set({'totalItems': 0});
                     alert('All links are reviewed.');
                     
                     if (currentLink.url) {
                         location.reload(); 
                     }
                 } else {
+                    let status = 'not_qualified';
+                    if (message.status == 'approve') status = 'qualified';
+
+                    let note = '';
+                    if (message.data.note) note = message.data.note;
+ 
+                    currentLink = {
+                        url: message.data.link, 
+                        status: status, 
+                        emails: message.emails, 
+                        primaryEmail: message.primary_email,
+                        title: message.data.title, 
+                        note: note, 
+                        website_name: message.data.site_name,
+                        dr: message.data.dr
+                    };
+
+                    allLinks[activeIndex] = currentLink;
 
                     if (currentLink.url == nextLinkToLoad.url) {
                         nextLinkToLoad.url = allLinks[activeIndex + 1];
-                    }
-
-                    if (message.status == 'approve') {
-                        allLinks[activeIndex]['status'] = 'qualified';
-                    } else {
-                        allLinks[activeIndex]['status'] = 'not_qualified';
                     }
 
                     chrome.storage.local.set({linkMarkerLinks: allLinks});
@@ -218,17 +218,20 @@ function injectIframe(){
 async function setInitialDataToAngular(){
     var theLinkToLoad = currentLink;
     if ( typeof currentLink !== 'undefined' && currentLink != null) {
-        theLinkToLoad.status = 'under_review';
+        if (!theLinkToLoad.status) theLinkToLoad.status = 'under_review';
     } else {
         theLinkToLoad =  {url: '', status: '', emails: [], website_url: '', title: '', note: '', website_name: ''};
     }
 
+    // Get site name
     let siteName = $('meta[property="og:site_name"]').attr('content');
     var domainURL = window.location.href.split("/");
     if (!siteName) {
         siteName = domainURL[2].split('.');
         siteName = siteName[ siteName.length - 2 ];
     }
+
+    // Get page title
     let pageTitle = $('meta[property="og:title"]').attr('content');
     if (!pageTitle) {
         pageTitle = $('title').html();
@@ -237,11 +240,16 @@ async function setInitialDataToAngular(){
     theLinkToLoad.website_url = domainURL[2];
     theLinkToLoad.title = pageTitle;
     theLinkToLoad.website_name = siteName;
+
+    if (currentLink.title && currentLink.title != '') theLinkToLoad.title = currentLink.title;
+    if (currentLink.link && currentLink.link != '') theLinkToLoad.link = currentLink.link;
+    if (currentLink.note && currentLink.note != '') theLinkToLoad.note = currentLink.note;
+    if (currentLink.site_name && currentLink.site_name != '') theLinkToLoad.site_name = currentLink.site_name;
+
     let data = {
         linkData: theLinkToLoad
     }
 
-    console.log('Data sent to angular', data)
     chrome.runtime.sendMessage(data);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
@@ -255,6 +263,8 @@ async function setInitialDataToAngular(){
         } 
     });
 
+    sendEmails();
+    sendAllLinks(); 
     sendPaginationData();
 }
 
@@ -314,26 +324,6 @@ function addLinksToStorage(message){
     chrome.storage.sync.set({'totalItems': allLinks.length});
 }
 
-/**
- * Add emails to current link
- * @param {array} emails 
- */
-function addEmailsToCurrentLink(emails){
-    allLinks[activeIndex].link.website.emails = emails;
-
-    chrome.storage.local.set({'linkMarkerLinks': allLinks});
-
-    var domainURL = window.location.href.split("/");
-    siteName = domainURL[2];
-    allLinks.forEach((item) => {
-        if (item.url.includes(domainURL[2])) {
-            item.website.emails = emails;
-        }
-    });
-
-    chrome.storage.local.set({'linkMarkerLinks': allLinks});
-}
-
 /*
 * Load link by pagination index
 */
@@ -358,6 +348,20 @@ function sendPaginationData(){
     }
 }
 
+function sendEmails(){
+    if (currentLink.emails && currentLink.emails.length > 0) {
+        chrome.runtime.sendMessage({
+            emails: currentLink.emails
+        });
+    }
+}
+
+function sendAllLinks(){
+    chrome.runtime.sendMessage({
+        allLinks: allLinks
+    });
+}
+
 /*
  * Remove query param from URL
 */
@@ -379,6 +383,18 @@ function removeParam(key, sourceURL) {
     return rtn;
 }
 
+/**
+ * Reset data
+ */
+function resetData(){
+    chrome.storage.local.set({'linkMarkerLinks': []});
+    chrome.storage.sync.set({'activeIndex': 0});
+    chrome.storage.sync.set({'totalItems': 0});
+}
+
+/**
+ * Start Prospecting
+ */
 function startProspecting(){
     if (currentLink) {
         window.location.href = currentLink.url;

@@ -63,28 +63,24 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             if (typeof message.reset_data !== 'undefined'){
                 resetData();
             }
+
+            if (typeof message.links_exported !== 'undefined'){
+                removeExportedLinks();
+            }
             
             if ( typeof message.showNextSite !== 'undefined') {
-
-                if (nextLinkToLoad == null){
+                if (typeof nextLinkToLoad === 'undefined' || nextLinkToLoad == null){
                     chrome.storage.local.set({'linkMarkerLinks': []});
                     chrome.storage.sync.set({'activeIndex': 0});
                     chrome.storage.sync.set({'totalItems': 0});
-                    alert('All links are reviewed.');
 
-                    if (currentLink.url) {
-                        location.reload(); 
-                    }
+                    chrome.runtime.sendMessage({
+                        link_marker_review_finished: true
+                    });
 
-                } else  if (typeof nextLinkToLoad === 'undefined') {
-                    chrome.storage.local.set({'linkMarkerLinks': []});
-                    chrome.storage.sync.set({'activeIndex': 0});
-                    chrome.storage.sync.set({'totalItems': 0});
-                    alert('All links are reviewed.');
-                    
-                    if (currentLink.url) {
-                        location.reload(); 
-                    }
+                    activeIndex = 0;
+                    totalItems = 0;
+                    sendPaginationData();
                 } else {
                     let status = 'not_qualified';
                     if (message.status == 'approve') status = 'qualified';
@@ -92,6 +88,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     let note = '';
                     if (message.data.note) note = message.data.note;
  
+                    var domainURL = window.location.href.split("/");
                     currentLink = {
                         url: message.data.link, 
                         status: status, 
@@ -100,7 +97,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                         title: message.data.title, 
                         note: note, 
                         website_name: message.data.site_name,
-                        dr: message.data.dr
+                        dr: message.data.dr,
+                        website_url: domainURL[2]
                     };
 
                     allLinks[activeIndex] = currentLink;
@@ -241,10 +239,10 @@ async function setInitialDataToAngular(){
     theLinkToLoad.title = pageTitle;
     theLinkToLoad.website_name = siteName;
 
-    if (currentLink.title && currentLink.title != '') theLinkToLoad.title = currentLink.title;
-    if (currentLink.link && currentLink.link != '') theLinkToLoad.link = currentLink.link;
-    if (currentLink.note && currentLink.note != '') theLinkToLoad.note = currentLink.note;
-    if (currentLink.site_name && currentLink.site_name != '') theLinkToLoad.site_name = currentLink.site_name;
+    if (currentLink && currentLink.title != '') theLinkToLoad.title = currentLink.title;
+    if (currentLink && currentLink.link != '') theLinkToLoad.link = currentLink.link;
+    if (currentLink && currentLink.note != '') theLinkToLoad.note = currentLink.note;
+    if (currentLink && currentLink.site_name != '') theLinkToLoad.site_name = currentLink.site_name;
 
     let data = {
         linkData: theLinkToLoad
@@ -338,14 +336,13 @@ function loadLinkByIndex(pageIndex) {
 * Send pagination data to pagination element
 */
 function sendPaginationData(){
-    if (totalItems != 0){
-        let data = {
-            active_index: activeIndex,
-            batch_items_count: totalItems
-        };
+    let data = {
+        active_index: activeIndex,
+        batch_items_count: totalItems
+    };
 
-        chrome.runtime.sendMessage(data);
-    }
+    chrome.runtime.sendMessage(data);
+    
 }
 
 function sendEmails(){
@@ -399,4 +396,37 @@ function startProspecting(){
     if (currentLink) {
         window.location.href = currentLink.url;
     }
+}
+
+function removeExportedLinks(){
+    let leftLinks = [];
+    allLinks.forEach(item => {
+        if (item.status != 'qualified' && item.status != 'not_qualified') {
+            leftLinks.push(item);
+        }
+    });
+
+    let newActiveIndex = activeIndex - (allLinks.length - leftLinks.length) + 1;
+    chrome.storage.local.set({'linkMarkerLinks': leftLinks});
+    chrome.storage.sync.set({'activeIndex': newActiveIndex});
+    chrome.storage.sync.set({'totalItems': leftLinks.length});
+
+    activeIndex = newActiveIndex;
+    totalItems = leftLinks.length;
+
+    if (currentLink.status != 'under_review') {
+        let checkReload  = false;
+        for (var i = newActiveIndex; i < leftLinks.length; i++) {
+            if (leftLinks[i] && leftLinks[i].status && (leftLinks[i].status == '' || leftLinks[i].status == 'under_review') && !checkReload) {
+                checkReload = true;
+                window.location.href = leftLinks[i].url;
+            }
+
+            if (typeof leftLinks[i].status == 'undefined' && !checkReload) {
+                checkReload = true;
+                window.location.href = leftLinks[i].url;
+            }
+        }
+    }
+    sendPaginationData();
 }

@@ -6,6 +6,7 @@ var totalItems = 0;
 var iframeInjected = false;
 var urlParams = new URLSearchParams(window.location.search);
 var activeLinks = [];
+//chrome.storage.sync.set({'activeIndex': 0});
 
 chrome.storage.sync.get(['activeIndex'], function(item) {
     if (typeof item.activeIndex !== 'undefined') {
@@ -70,6 +71,11 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             
             if ( typeof message.showNextSite !== 'undefined') {
                 if (typeof nextLinkToLoad === 'undefined' || nextLinkToLoad == null){
+                    setCurrentLinkData(message);
+                    chrome.runtime.sendMessage({
+                        allLinks: allLinks
+                    });
+
                     chrome.storage.local.set({'linkMarkerLinks': []});
                     chrome.storage.sync.set({'activeIndex': 0});
                     chrome.storage.sync.set({'totalItems': 0});
@@ -82,34 +88,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     totalItems = 0;
                     sendPaginationData();
                 } else {
-                    let status = 'not_qualified';
-                    if (message.status == 'approve') status = 'qualified';
-
-                    let note = '';
-                    if (message.data.note) note = message.data.note;
- 
-                    var domainURL = window.location.href.split("/");
-                    currentLink = {
-                        url: message.data.link, 
-                        status: status, 
-                        emails: message.emails, 
-                        primaryEmail: message.primary_email,
-                        title: message.data.title, 
-                        note: note, 
-                        website_name: message.data.site_name,
-                        dr: message.data.dr,
-                        website_url: domainURL[2]
-                    };
-
-                    allLinks[activeIndex] = currentLink;
-
-                    if (currentLink.url == nextLinkToLoad.url) {
-                        nextLinkToLoad.url = allLinks[activeIndex + 1];
-                    }
-
-                    chrome.storage.local.set({linkMarkerLinks: allLinks});
-                    chrome.storage.sync.set({activeIndex: activeIndex  + 1});
-
+                    setCurrentLinkData(message);
                     window.location.href = nextLinkToLoad.url;
                 }
             }
@@ -117,6 +96,36 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
     }
 
 });
+
+function setCurrentLinkData(message){
+    let status = 'not_qualified';
+    if (message.status == 'approve') status = 'qualified';
+
+    let note = '';
+    if (message.data.note) note = message.data.note;
+
+    var domainURL = window.location.href.split("/");
+    currentLink = {
+        title: message.data.title,
+        url: message.data.link, 
+        status: status, 
+        website_name: message.data.site_name,
+        website_url: domainURL[2],
+        dr: message.data.dr,
+        emails: message.emails, 
+        primaryEmail: message.primary_email,
+        note: note   
+    };
+
+    allLinks[activeIndex] = currentLink;
+
+    if (nextLinkToLoad && nextLinkToLoad != null && currentLink.url == nextLinkToLoad.url) {
+        nextLinkToLoad.url = allLinks[activeIndex + 1];
+    }
+
+    chrome.storage.local.set({linkMarkerLinks: allLinks});
+    chrome.storage.sync.set({activeIndex: activeIndex  + 1});
+}
 
 window.onload = function (){
     //Show prospector
@@ -247,7 +256,6 @@ async function setInitialDataToAngular(){
     let data = {
         linkData: theLinkToLoad
     }
-
     chrome.runtime.sendMessage(data);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
@@ -326,9 +334,8 @@ function addLinksToStorage(message){
 * Load link by pagination index
 */
 function loadLinkByIndex(pageIndex) {
-   
     let urlByIndex = allLinks[pageIndex].url;
-    
+
     window.location.href = urlByIndex;
 }
 
@@ -346,7 +353,7 @@ function sendPaginationData(){
 }
 
 function sendEmails(){
-    if (currentLink.emails && currentLink.emails.length > 0) {
+    if (currentLink && currentLink.emails && currentLink.emails.length > 0) {
         chrome.runtime.sendMessage({
             emails: currentLink.emails
         });
@@ -387,6 +394,14 @@ function resetData(){
     chrome.storage.local.set({'linkMarkerLinks': []});
     chrome.storage.sync.set({'activeIndex': 0});
     chrome.storage.sync.set({'totalItems': 0});
+
+    chrome.runtime.sendMessage({
+        allLinks: []
+    });
+
+    activeIndex = 0;
+    totalItems = 0;
+    sendPaginationData();
 }
 
 /**
@@ -406,27 +421,38 @@ function removeExportedLinks(){
         }
     });
 
-    let newActiveIndex = activeIndex - (allLinks.length - leftLinks.length) + 1;
+    let newActiveIndex = activeIndex - (allLinks.length - leftLinks.length);
     chrome.storage.local.set({'linkMarkerLinks': leftLinks});
     chrome.storage.sync.set({'activeIndex': newActiveIndex});
     chrome.storage.sync.set({'totalItems': leftLinks.length});
 
-    activeIndex = newActiveIndex;
+    chrome.runtime.sendMessage({
+        allLinks: leftLinks
+    });
+    
+    
     totalItems = leftLinks.length;
+    activeIndex = newActiveIndex;
 
     if (currentLink.status != 'under_review') {
         let checkReload  = false;
+
         for (var i = newActiveIndex; i < leftLinks.length; i++) {
             if (leftLinks[i] && leftLinks[i].status && (leftLinks[i].status == '' || leftLinks[i].status == 'under_review') && !checkReload) {
+                chrome.storage.sync.set({'activeIndex': i});
                 checkReload = true;
                 window.location.href = leftLinks[i].url;
             }
 
-            if (typeof leftLinks[i].status == 'undefined' && !checkReload) {
+            if (leftLinks[i] && typeof leftLinks[i].status == 'undefined' && !checkReload) {
+                chrome.storage.sync.set({'activeIndex': i});
                 checkReload = true;
                 window.location.href = leftLinks[i].url;
             }
         }
+    } else {
+        chrome.storage.sync.set({'activeIndex': activeIndex});
+        allLinks = leftLinks;
     }
     sendPaginationData();
 }

@@ -6,7 +6,6 @@ var totalItems = 0;
 var iframeInjected = false;
 var urlParams = new URLSearchParams(window.location.search);
 var activeLinks = [];
-//chrome.storage.sync.set({'activeIndex': 0});
 
 chrome.storage.sync.get(['activeIndex'], function(item) {
     if (typeof item.activeIndex !== 'undefined') {
@@ -31,7 +30,9 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
                 showProspector();
             }
         })
-    } 
+    } else {
+        chrome.storage.local.set({'linkMarkerLinks': []});
+    }
 });
 
 chrome.storage.sync.get(['totalItems'], function(item) {

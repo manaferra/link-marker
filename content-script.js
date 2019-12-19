@@ -32,6 +32,8 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         })
     } else {
         chrome.storage.local.set({'linkMarkerLinks': []});
+        allLinks = [];
+        currentLink = [];
     }
 });
 

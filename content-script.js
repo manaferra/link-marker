@@ -33,7 +33,7 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
     } else {
         chrome.storage.local.set({'linkMarkerLinks': []});
         allLinks = [];
-        currentLink = [];
+        currentLink = null;
     }
 });
 
@@ -260,6 +260,8 @@ async function setInitialDataToAngular(){
         linkData: theLinkToLoad
     }
     chrome.runtime.sendMessage(data);
+
+
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         if (typeof items.linkMarkerLinks !== 'undefined') {

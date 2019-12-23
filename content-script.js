@@ -24,9 +24,12 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         }
 
         activeLinks = allLinks.map(obj => obj.url);
+        let pageURL = document.location.href;
+        pageURL = pageURL.replace(/(^\w+:|^)\/\//, '');
+
         activeLinks.forEach((activeLink) => {
             // Show prospector if domain matches
-            if (activeLink.includes(document.location.href)) {
+            if (activeLink.includes(pageURL)) {
                 showProspector();
             }
         })

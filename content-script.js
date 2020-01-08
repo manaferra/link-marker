@@ -263,8 +263,8 @@ async function setInitialDataToAngular(){
         linkData: theLinkToLoad
     }
     chrome.runtime.sendMessage(data);
-
-
+    console.log('Data sent', data);
+    console.log('Current Link', currentLink);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         if (typeof items.linkMarkerLinks !== 'undefined') {

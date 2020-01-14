@@ -6,6 +6,8 @@ var totalItems = 0;
 var iframeInjected = false;
 var urlParams = new URLSearchParams(window.location.search);
 var activeLinks = [];
+var brokenLinks = [];
+var selectedBrokenLink = {};
 
 chrome.storage.sync.get(['activeIndex'], function(item) {
     if (typeof item.activeIndex !== 'undefined') {
@@ -18,6 +20,7 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
     if (typeof items.linkMarkerLinks !== 'undefined') {
         currentLink = items.linkMarkerLinks[activeIndex];
         allLinks = items.linkMarkerLinks;
+        console.log('Links', allLinks);
 
         if (typeof items.linkMarkerLinks[activeIndex + 1] !== 'undefined') {
             nextLinkToLoad = items.linkMarkerLinks[activeIndex + 1];
@@ -43,6 +46,18 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
 chrome.storage.sync.get(['totalItems'], function(item) {
     if (typeof item.totalItems !== 'undefined') {
         totalItems = item.totalItems;
+    } 
+});
+
+chrome.storage.local.get(['linkMarker_brokenLinks'], function(items) {
+    if (typeof items.linkMarker_brokenLinks !== 'undefined') {
+        brokenLinks = items.linkMarker_brokenLinks;
+    } 
+});
+
+chrome.storage.local.get(['linkMarker_selectedBrokenLinks'], function(items) {
+    if (typeof items.linkMarker_selectedBrokenLinks !== 'undefined') {
+        selectedBrokenLink = items.linkMarker_selectedBrokenLinks;
     } 
 });
 
@@ -80,7 +95,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             }
 
             if ( typeof message.broken_links !== 'undefined') {
-                chrome.storage.local.set({'brokenLinks': message.broken_links});
+                chrome.storage.local.set({'linkMarker_brokenLinks': message.broken_links});
                 brokenLinks = message.broken_links;
                 highlightBrokenLinks();
             }
@@ -99,6 +114,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     chrome.storage.local.set({'linkMarkerLinks': []});
                     chrome.storage.sync.set({'activeIndex': 0});
                     chrome.storage.sync.set({'totalItems': 0});
+                    chrome.storage.local.set({'linkMarker_brokenLinks': []});
+                    chrome.storage.local.set({'linkMarker_selectedBrokenLinks': {}});
 
                     chrome.runtime.sendMessage({
                         link_marker_review_finished: true
@@ -108,6 +125,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
                     totalItems = 0;
                     sendPaginationData();
                 } else {
+                    chrome.storage.local.set({'linkMarker_brokenLinks': []});
+                    chrome.storage.local.set({'linkMarker_selectedBrokenLinks': {}});
                     setCurrentLinkData(message);
                     window.location.href = nextLinkToLoad.url;
                 }
@@ -134,8 +153,12 @@ function setCurrentLinkData(message){
         dr: message.data.dr,
         emails: message.emails, 
         primaryEmail: message.primary_email,
-        note: note   
+        note: note,
+        brokenLinks: brokenLinks,
+        selected_broken_link: selectedBrokenLink 
     };
+
+
 
     allLinks[activeIndex] = currentLink;
 
@@ -170,10 +193,12 @@ async function showProspector(tabID){
     }
 
     forceExtensionDisplay();
+    highlightBrokenLinks();
     
     window.onload = function (){
         sendPaginationData();
         forceExtensionDisplay();
+        highlightBrokenLinks();
     }  
 }
 
@@ -273,10 +298,19 @@ async function setInitialDataToAngular(){
     if (currentLink && currentLink.note != '') theLinkToLoad.note = currentLink.note;
     if (currentLink && currentLink.site_name != '') theLinkToLoad.site_name = currentLink.site_name;
 
+    if (brokenLinks.length){
+        currentLink.brokenLinks = brokenLinks;
+
+        if (!currentLink.selected_broken_link && selectedBrokenLink && selectedBrokenLink.url) {
+            currentLink.selected_broken_link = selectedBrokenLink;
+        }
+    }
+
     let data = {
         linkData: theLinkToLoad
     }
     chrome.runtime.sendMessage(data);
+    console.log('Data sent', data);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         if (typeof items.linkMarkerLinks !== 'undefined') {
@@ -489,9 +523,6 @@ function scrapeBrokenLinks(){
         foundLinks: linksList[0]
     }
     chrome.runtime.sendMessage(data);
-
-    console.log('Linkss', linksList[0].length, data);
-    console.log('Scrape Broken links')
 }
 
 /**
@@ -518,6 +549,8 @@ function scrollToBrokenLink(brokenLink){
         });
         element.css('border', '0px');
     })
+    chrome.storage.local.set({'linkMarker_selectedBrokenLinks': brokenLink});
+    selectedBrokenLink = brokenLink;
 
     let element = $("body a").filter(function() {
         return $(this).text() === brokenLink.innerText;

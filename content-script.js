@@ -74,6 +74,20 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             if (typeof message.links_exported !== 'undefined'){
                 removeExportedLinks();
             }
+
+            if (typeof message.broken_links_check !== 'undefined' && message.broken_links_check){
+                scrapeBrokenLinks();
+            }
+
+            if ( typeof message.broken_links !== 'undefined') {
+                chrome.storage.local.set({'brokenLinks': message.broken_links});
+                brokenLinks = message.broken_links;
+                highlightBrokenLinks();
+            }
+
+            if ( typeof message.highlight_broken_link !== 'undefined') {
+                scrollToBrokenLink(message.highlight_broken_link);
+            }
             
             if ( typeof message.showNextSite !== 'undefined') {
                 if (typeof nextLinkToLoad === 'undefined' || nextLinkToLoad == null){
@@ -461,4 +475,57 @@ function removeExportedLinks(){
         allLinks = leftLinks;
     }
     sendPaginationData();
+}
+
+function scrapeBrokenLinks(){
+    let linksList = [];
+    let content = $('body').html();
+
+    if (content && content != null && content != '') {
+        linksList.push(content.match(/(<\s*a[^>]*>(.*?)<\s*\/\s*a>)/gi))
+    }
+
+    let data = {
+        foundLinks: linksList[0]
+    }
+    chrome.runtime.sendMessage(data);
+
+    console.log('Linkss', linksList[0].length, data);
+    console.log('Scrape Broken links')
+}
+
+/**
+ * Highlight Broken Links
+ */
+function highlightBrokenLinks(){
+    brokenLinks.forEach(item => {
+        let element = $("body a").filter(function() {
+            return $(this).text() === item.innerText;
+        });
+        element.css('background-color', 'yellow');
+        element.css('color', '#000');
+    })
+}
+
+/**
+ * Scroll to selected broken link
+ * @param {object} brokenLink 
+ */
+function scrollToBrokenLink(brokenLink){
+    brokenLinks.forEach(item => {
+        let element = $("body a").filter(function() {
+            return $(this).text() === item.innerText;
+        });
+        element.css('border', '0px');
+    })
+
+    let element = $("body a").filter(function() {
+        return $(this).text() === brokenLink.innerText;
+    });
+
+    $([document.documentElement, document.body]).animate({
+        scrollTop: element.offset().top - 300
+    }, 2000);
+
+    element.css('border', '1px solid red');
 }

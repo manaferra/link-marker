@@ -20,7 +20,6 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
     if (typeof items.linkMarkerLinks !== 'undefined') {
         currentLink = items.linkMarkerLinks[activeIndex];
         allLinks = items.linkMarkerLinks;
-        console.log('Links', allLinks);
 
         if (typeof items.linkMarkerLinks[activeIndex + 1] !== 'undefined') {
             nextLinkToLoad = items.linkMarkerLinks[activeIndex + 1];
@@ -28,11 +27,12 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
 
         activeLinks = allLinks.map(obj => obj.url);
         let pageURL = document.location.href;
-        pageURL = pageURL.replace(/(^\w+:|^)\/\//, '');
+        //pageURL = pageURL.replace(/(^\w+:|^)\/\//, '');
+        pageURL = pageURL.split('/');
 
         activeLinks.forEach((activeLink) => {
             // Show prospector if domain matches
-            if (activeLink.includes(pageURL)) {
+            if (activeLink.includes(pageURL[2])) {
                 showProspector();
             }
         })
@@ -68,6 +68,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
     } else {
         if (typeof message.pageIndex !== 'undefined') {
             chrome.storage.sync.set({'activeIndex': message.pageIndex});
+            chrome.storage.local.set({'linkMarker_brokenLinks': []});
+            chrome.storage.local.set({'linkMarker_selectedBrokenLinks': {}});
             loadLinkByIndex(message.pageIndex);
         }
        
@@ -158,8 +160,6 @@ function setCurrentLinkData(message){
         selected_broken_link: selectedBrokenLink 
     };
 
-
-
     allLinks[activeIndex] = currentLink;
 
     if (nextLinkToLoad && nextLinkToLoad != null && currentLink.url == nextLinkToLoad.url) {
@@ -194,11 +194,13 @@ async function showProspector(tabID){
 
     forceExtensionDisplay();
     highlightBrokenLinks();
+    highlightEmails();
     
     window.onload = function (){
         sendPaginationData();
         forceExtensionDisplay();
         highlightBrokenLinks();
+        highlightEmails();
     }  
 }
 
@@ -310,7 +312,6 @@ async function setInitialDataToAngular(){
         linkData: theLinkToLoad
     }
     chrome.runtime.sendMessage(data);
-    console.log('Data sent', data);
 
     chrome.storage.local.get(['linkMarkerLinks'], function(items) {
         if (typeof items.linkMarkerLinks !== 'undefined') {
@@ -355,7 +356,6 @@ function toggle(tabID){
 
     if(!iframe){
         showProspector();
-
     } else {
         hideProspector(tabID);
     }
@@ -448,6 +448,8 @@ function resetData(){
     chrome.storage.local.set({'linkMarkerLinks': []});
     chrome.storage.sync.set({'activeIndex': 0});
     chrome.storage.sync.set({'totalItems': 0});
+    chrome.storage.sync.set({'linkMarker_brokenLinks': []});
+    chrome.storage.sync.set({'linkMarker_selectedBrokenLinks': {}});
 
     chrome.runtime.sendMessage({
         allLinks: []
@@ -561,4 +563,26 @@ function scrollToBrokenLink(brokenLink){
     }, 2000);
 
     element.css('border', '1px solid red');
+}
+
+function highlightEmails(){
+    let content = $('body').html();
+
+    let emails = [];
+    if (content && content != null && content != '') {
+        emails.push(content.match(/(href=\"mailto:([^\"]*)\")/gi))
+        emails.push(content.match(/(href=&quot;mailto:([^(&quot;)].*)&quot;)/gi))
+    }
+
+    emails.forEach(items => {
+        if (items != null) {
+            items.forEach(mailValue => {
+                let hrefAttr = mailValue.slice(6).slice(0, -1);
+               
+                if (!hrefAttr.includes('var ')) {
+                    $("a[href='"+hrefAttr+"']").css('background-color', 'orange');
+                }
+            })
+        }
+    })
 }

@@ -63,6 +63,7 @@ chrome.storage.local.get(['linkMarker_selectedBrokenLinks'], function(items) {
 
 //listen to events/messages
 chrome.runtime.onMessage.addListener(function(message, sender, optional){
+
     if(message === "toggle"){
         toggle(sender.id);
     } else {
@@ -76,7 +77,6 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
         if ( typeof message === 'object') {
             // Check data for next links
             if ( typeof message.fileData !== 'undefined') {
-                
                 addLinksToStorage(message);
             }
 
@@ -518,11 +518,11 @@ function scrapeBrokenLinks(){
     let content = $('body').html();
 
     if (content && content != null && content != '') {
-        linksList.push(content.match(/(<\s*a[^>]*>(.*?)<\s*\/\s*a>)/gi))
+        linksList = content.match(/(<\s*a[^>]*>(.*?)<\s*\/\s*a>)/gi)
     }
 
     let data = {
-        foundLinks: linksList[0]
+        foundLinks: linksList
     }
     chrome.runtime.sendMessage(data);
 }

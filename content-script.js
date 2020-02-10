@@ -448,8 +448,8 @@ function resetData(){
     chrome.storage.local.set({'linkMarkerLinks': []});
     chrome.storage.sync.set({'activeIndex': 0});
     chrome.storage.sync.set({'totalItems': 0});
-    chrome.storage.sync.set({'linkMarker_brokenLinks': []});
-    chrome.storage.sync.set({'linkMarker_selectedBrokenLinks': {}});
+    chrome.storage.local.set({'linkMarker_brokenLinks': []});
+    chrome.storage.local.set({'linkMarker_selectedBrokenLinks': {}});
 
     chrome.runtime.sendMessage({
         allLinks: []

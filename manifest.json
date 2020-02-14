@@ -1,7 +1,7 @@
 {
     "name": "Link Marker",
     "description": "Prospecting Tool",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "manifest_version": 2,
     "content_scripts": [{
         "js": [
@@ -27,7 +27,8 @@
     "icons": { 
         "16": "assets/icons/16x16.png",
         "48": "assets/icons/48x48.png",
-        "96": "assets/icons/96x96.png" 
+        "96": "assets/icons/96x96.png",
+        "128": "assets/icons/128x128.png"
     },
     "permissions": [ "tabs", "activeTab", "contextMenus", "notifications", "storage", "unlimitedStorage", "http://*/*", "https://*/*" ],
     "optional_permissions": [ "webRequest" ],

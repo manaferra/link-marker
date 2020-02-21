@@ -1,6 +1,6 @@
 {
-    "name": "Link Marker",
-    "description": "Prospecting Tool",
+    "name": "Link Marker by Manaferra",
+    "description": "The Link Marker for Chrome makes prospecting faster & easier.",
     "version": "1.0.3",
     "manifest_version": 2,
     "content_scripts": [{
@@ -17,7 +17,7 @@
     },
     "browser_action": {
         "default_icon": "assets/icons/16x16.png",
-        "default_title": "Link Marker"
+        "default_title": "Link Marker by Manaferra"
     },
     "web_accessible_resources": [
         "index.html",

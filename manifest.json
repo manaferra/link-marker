@@ -1,7 +1,7 @@
 {
     "name": "Link Marker by Manaferra",
     "description": "The Link Marker for Chrome makes prospecting faster & easier.",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "manifest_version": 2,
     "content_scripts": [{
         "js": [

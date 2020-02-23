@@ -12,7 +12,7 @@ var selectedBrokenLink = {};
 chrome.storage.sync.get(['activeIndex'], function(item) {
     if (typeof item.activeIndex !== 'undefined') {
         activeIndex = item.activeIndex;
-    } 
+    }
 });
 
 //Get Links from chrome storage
@@ -46,23 +46,23 @@ chrome.storage.local.get(['linkMarkerLinks'], function(items) {
 chrome.storage.sync.get(['totalItems'], function(item) {
     if (typeof item.totalItems !== 'undefined') {
         totalItems = item.totalItems;
-    } 
+    }
 });
 
 chrome.storage.local.get(['linkMarker_brokenLinks'], function(items) {
     if (typeof items.linkMarker_brokenLinks !== 'undefined') {
         brokenLinks = items.linkMarker_brokenLinks;
-    } 
+    }
 });
 
 chrome.storage.local.get(['linkMarker_selectedBrokenLinks'], function(items) {
     if (typeof items.linkMarker_selectedBrokenLinks !== 'undefined') {
         selectedBrokenLink = items.linkMarker_selectedBrokenLinks;
-    } 
+    }
 });
 
 //listen to events/messages
-chrome.runtime.onMessage.addListener(function(message, sender, optional){
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse){
 
     if(message === "toggle"){
         toggle(sender.id);
@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             chrome.storage.local.set({'linkMarker_selectedBrokenLinks': {}});
             loadLinkByIndex(message.pageIndex);
         }
-       
+
         if ( typeof message === 'object') {
             // Check data for next links
             if ( typeof message.fileData !== 'undefined') {
@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
             if ( typeof message.highlight_broken_link !== 'undefined') {
                 scrollToBrokenLink(message.highlight_broken_link);
             }
-            
+
             if ( typeof message.showNextSite !== 'undefined') {
                 if (typeof nextLinkToLoad === 'undefined' || nextLinkToLoad == null){
                     setCurrentLinkData(message);
@@ -136,6 +136,9 @@ chrome.runtime.onMessage.addListener(function(message, sender, optional){
         }
     }
 
+    sendResponse();  // if you uncomment this line, error will disappear...
+    return true; // if you uncomment this line, error will also disappear (indicates async callback)
+
 });
 
 function setCurrentLinkData(message){
@@ -148,16 +151,16 @@ function setCurrentLinkData(message){
     var domainURL = window.location.href.split("/");
     currentLink = {
         title: message.data.title,
-        url: message.data.link, 
-        status: status, 
+        url: message.data.link,
+        status: status,
         website_name: message.data.site_name,
         website_url: domainURL[2],
         dr: message.data.dr,
-        emails: message.emails, 
+        emails: message.emails,
         primaryEmail: message.primary_email,
         note: note,
         brokenLinks: brokenLinks,
-        selected_broken_link: selectedBrokenLink 
+        selected_broken_link: selectedBrokenLink
     };
 
     allLinks[activeIndex] = currentLink;
@@ -195,13 +198,13 @@ async function showProspector(tabID){
     forceExtensionDisplay();
     highlightBrokenLinks();
     highlightEmails();
-    
+
     window.onload = function (){
         sendPaginationData();
         forceExtensionDisplay();
         highlightBrokenLinks();
         highlightEmails();
-    }  
+    }
 }
 
 function forceExtensionDisplay(){
@@ -255,7 +258,7 @@ function injectIframe(){
     insertAfterDOM(iframe, header);
     document.getElementById('prospector-extension').onload= function() {
         setInitialDataToAngular();
-    }; 
+    };
 
     var paginationIframe = document.createElement('iframe');
     paginationIframe.style.display = "block";
@@ -320,12 +323,12 @@ async function setInitialDataToAngular(){
             } else {
                 nextLinkToLoad = null;
             }
-            
-        } 
+
+        }
     });
 
     sendEmails();
-    sendAllLinks(); 
+    sendAllLinks();
     sendPaginationData();
 }
 
@@ -363,7 +366,7 @@ function toggle(tabID){
 
 /**
  * Add Links to Storage
- * @param {array} message 
+ * @param {array} message
  */
 function addLinksToStorage(message){
     allLinks = [];
@@ -379,8 +382,8 @@ function addLinksToStorage(message){
 
     if(typeof allLinks[nextIndex] !== 'undefined'){
         nextLinkToLoad = allLinks[nextIndex];
-    } 
-    
+    }
+
     chrome.storage.sync.set({'totalItems': allLinks.length});
 }
 
@@ -403,7 +406,7 @@ function sendPaginationData(){
     };
 
     chrome.runtime.sendMessage(data);
-    
+
 }
 
 function sendEmails(){
@@ -485,8 +488,8 @@ function removeExportedLinks(){
     chrome.runtime.sendMessage({
         allLinks: leftLinks
     });
-    
-    
+
+
     totalItems = leftLinks.length;
     activeIndex = newActiveIndex;
 
@@ -542,7 +545,7 @@ function highlightBrokenLinks(){
 
 /**
  * Scroll to selected broken link
- * @param {object} brokenLink 
+ * @param {object} brokenLink
  */
 function scrollToBrokenLink(brokenLink){
     brokenLinks.forEach(item => {
@@ -578,7 +581,7 @@ function highlightEmails(){
         if (items != null) {
             items.forEach(mailValue => {
                 let hrefAttr = mailValue.slice(6).slice(0, -1);
-               
+
                 if (!hrefAttr.includes('var ')) {
                     $("a[href='"+hrefAttr+"']").css('background-color', 'orange');
                 }
